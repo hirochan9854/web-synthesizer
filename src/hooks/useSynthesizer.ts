@@ -50,7 +50,13 @@ export const useSynthesizer = () => {
     }
   }, [params.volume]);
 
-  const noteToFrequency = useCallback((note: string): number => {
+  const noteToFrequency = useCallback((note: string | number): number => {
+    // If it's a MIDI note number, convert to frequency
+    if (typeof note === 'number') {
+      return 440 * Math.pow(2, (note - 69) / 12);
+    }
+    
+    // If it's a note name string, use the existing mapping
     const noteMap: Record<string, number> = {
       'C4': 261.63, 'C#4': 277.18, 'D4': 293.66, 'D#4': 311.13,
       'E4': 329.63, 'F4': 349.23, 'F#4': 369.99, 'G4': 392.00,
@@ -62,8 +68,9 @@ export const useSynthesizer = () => {
     return noteMap[note] || 440;
   }, []);
 
-  const playNote = useCallback(async (note: string) => {
-    if (activeNotesRef.current.has(note)) return;
+  const playNote = useCallback(async (note: string | number) => {
+    const noteKey = note.toString();
+    if (activeNotesRef.current.has(noteKey)) return;
 
     await initAudioContext();
     
@@ -101,11 +108,12 @@ export const useSynthesizer = () => {
     
     oscillator.start(now);
     
-    activeNotesRef.current.set(note, { osc: oscillator, gain: gainNode, filter });
+    activeNotesRef.current.set(noteKey, { osc: oscillator, gain: gainNode, filter });
   }, [params, noteToFrequency, initAudioContext]);
 
-  const stopNote = useCallback((note: string) => {
-    const noteData = activeNotesRef.current.get(note);
+  const stopNote = useCallback((note: string | number) => {
+    const noteKey = note.toString();
+    const noteData = activeNotesRef.current.get(noteKey);
     if (!noteData || !audioContextRef.current) return;
 
     const now = audioContextRef.current.currentTime;
@@ -116,7 +124,7 @@ export const useSynthesizer = () => {
     gain.gain.linearRampToValueAtTime(0, now + params.release);
     
     osc.stop(now + params.release);
-    activeNotesRef.current.delete(note);
+    activeNotesRef.current.delete(noteKey);
   }, [params.release]);
 
   const updateParams = useCallback((newParams: Partial<SynthesizerParams>) => {
